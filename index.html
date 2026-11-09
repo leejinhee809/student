@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이쌤 학생관리</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4a6cf7">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="이쌤학생관리">
+<style>
+body{font-family:sans-serif;margin:0;background:#f4f6fb}
+header{background:#4a6cf7;color:#fff;padding:14px;font-size:20px;text-align:center}
+.box{background:#fff;margin:12px;padding:14px;border-radius:12px;box-shadow:0 1px 4px #0002}
+select,input,textarea,button{font-size:16px;width:100%;box-sizing:border-box;margin:4px 0;padding:10px;border-radius:8px;border:1px solid #ccc}
+button{background:#4a6cf7;color:#fff;border:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 12px 0}
+.tabs.in{padding:6px 0}
+.tab{width:auto;white-space:nowrap;background:#dfe5fb;color:#334;padding:8px 14px;margin:0}
+.tab.act{background:#4a6cf7;color:#fff;font-weight:bold}
+.tab.add{background:#fff;color:#4a6cf7;border:1px dashed #4a6cf7}
+.row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #eee}
+.row span{flex:1}
+.row button{width:auto;padding:8px 12px;margin:0}
+.row input[type=checkbox]{width:24px;height:24px;margin:0}
+.row input.mini{margin:0;padding:6px}
+.row.abs{background:#fff4e5}
+.on{background:#2ecc71}.del{background:#e74c3c}.sent{background:#999}.gray{background:#8a94a6}
+.start{border-left:6px solid #f39c12}.late{border-left:6px solid #3498db}.btnL{background:#3498db}.end{border-left:6px solid #2ecc71}
+.btnS{background:#f39c12}.today{background:#eaf7ef;border-radius:8px;padding:8px;margin:6px 0}.lessonBox{border-left:6px solid #9b59b6}
+.small{display:flex;gap:6px}.small button{font-size:13px;padding:6px}
+#check{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+#check .row{border:1px solid #e3e7f2;border-radius:8px;padding:8px 6px;gap:6px;min-width:0}
+#check .row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#check .row input[type=checkbox]{width:20px;height:20px;flex:none}
+#check .row.abs{border-color:#f39c12}
+#check > small{grid-column:1/-1}
+.tabwrap{margin:12px 12px 0}
+#schoolTabs{display:flex;gap:4px;overflow-x:auto;align-items:flex-end}
+#schoolTabs .tab{border-radius:10px 10px 0 0;padding:10px 16px;margin:0}
+#schoolTabs .tab.act{background:#fff;color:#4a6cf7;font-weight:bold}
+#schoolTabs .tab.add{background:transparent;border:1px dashed #4a6cf7;border-bottom:none;padding:8px 14px}
+.panel{background:#fff;border-radius:0 12px 12px 12px;padding:12px 14px;box-shadow:0 3px 4px -2px #0002}
+.panel .tabs{padding:0}
+.trio{display:flex;gap:6px;margin-top:6px}.trio button{flex:1;font-size:14px;padding:8px 4px;margin:0}
+.sub{border:1px solid #e3e7f2;border-radius:10px;padding:10px;margin:10px 0}
+small{color:#666}
+details summary{cursor:pointer;font-weight:bold}
+.ov{position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center;z-index:9}
+.mbox{background:#fff;border-radius:12px;padding:18px;width:80%;max-width:340px}
+</style>
+</head>
+<body>
+<header>이쌤 학생관리</header>
+
+<div class="tabwrap">
+  <div id="schoolTabs"></div>
+  <div class="panel">
+  <div id="addSchoolBox" style="display:none;margin-top:8px">
+    <input id="newSchool" placeholder="학교 이름 (예: 속초초)" lang="ko" autocomplete="off" autocapitalize="off">
+    <button onclick="addSchool()">학교 추가</button>
+  </div>
+  <b id="schoolTitle" style="display:none;margin-top:8px"></b>
+  <div class="tabs in" id="partTabs"></div>
+  <div class="small" id="schoolTools"></div>
+  </div>
+</div>
+
+<div class="box">
+  <b>출석 체크</b>
+  <div id="check"></div>
+</div>
+
+<div class="box start">
+  <b>수업 시작 — 결석 알림</b>
+  <textarea id="msgA" rows="3" oninput="saveMsg()"></textarea>
+  <div id="sendA"></div>
+</div>
+
+<div class="box late">
+  <b>늦게 온 아이 — 출석 알림</b>
+  <textarea id="msgL" rows="3" oninput="saveMsg()"></textarea>
+  <div id="sendL"></div>
+</div>
+
+<div class="box end">
+  <b>수업 끝 — 귀가 알림</b>
+  <div id="todayLesson"></div>
+  <div class="sub">
+    <b>📨 한꺼번에 보내기</b>
+    <textarea id="msgB" rows="2" oninput="saveMsg()"></textarea>
+    <div id="bulkBtn"></div>
+  </div>
+  <b>한 명씩 보내기</b>
+  <textarea id="msgE" rows="3" oninput="saveMsg()"></textarea>
+  <div id="sendE"></div>
+</div>
+
+<div class="box">
+  <details id="rosterBox">
+    <summary id="listTitle">학생 명단</summary>
+
+    <div class="sub">
+      <b>📷 명단 사진으로 한 번에 추가</b>
+      <input type="file" id="photo" accept="image/*" onchange="readPhoto(this)">
+      <div id="aiStatus"></div>
+      <div id="aiResult"></div>
+    </div>
+
+    <div class="sub">
+      <b>✏️ 한 명씩 추가</b>
+      <input id="sName" placeholder="학생 이름" lang="ko" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <input id="sPhone" placeholder="학부모 전화번호 (010-0000-0000)" type="tel" oninput="liveFmt(this)">
+      <button id="stuBtn" onclick="addStu()">학생 추가</button>
+      <button id="pickBtn" class="gray" onclick="pickContacts()" style="display:none">📱 휴대폰 연락처에서 불러오기</button>
+    </div>
+
+    <b>지금 명단</b>
+  <div id="list"></div>
+
+    <details class="sub">
+      <summary>⚙️ AI 설정</summary>
+      <input id="apiKey" placeholder="Gemini API 키" oninput="localStorage.setItem('attKey', apiKey.value.trim())">
+    </details>
+  </details>
+</div>
+
+<div class="box lessonBox">
+  <details id="lessonDet">
+    <summary id="lessonTitle">📅 수업 내용</summary>
+    <div class="sub">
+      <b>하루씩 넣기</b>
+      <input type="date" id="lDate">
+      <input id="lText" placeholder="수업 내용 (예: 로봇 팔 만들기)" lang="ko" autocomplete="off">
+      <button id="lBtn" onclick="addLesson()">수업 내용 저장</button>
+    </div>
+    <div class="sub">
+      <b>한 달 치 한 번에 넣기</b>
+      <textarea id="lBulk" rows="4" lang="ko" placeholder="11/12 로봇 팔 만들기&#10;11/19 센서 자동차&#10;11/26 코딩 미로 탈출"></textarea>
+      <button onclick="addLessonBulk()">한 번에 저장</button>
+    </div>
+    <div id="lessonList"></div>
+  </details>
+</div>
+
+<div class="box">
+  <b>💾 백업 · 복구 · 초기화</b>
+  <div class="trio">
+    <button onclick="backup()">💾 백업</button>
+    <button class="gray" onclick="restore()">📂 복구</button>
+    <button class="del" onclick="resetAll()">🗑 초기화</button>
+  </div>
+  <input type="file" id="restoreFile" accept=".json,application/json" style="display:none" onchange="restoreFromFile(this.files[0]); this.value=''">
+  <div id="backupTip"></div>
+</div>
+
+<div class="ov" id="modal"><div class="mbox"><p id="mMsg"></p>
+<div class="small"><button id="mNo" class="gray">취소</button><button id="mYes">확인</button></div></div></div>
+
+<script>
+// ---------- 확인창 ----------
+function ask(msg, yes){
+  mMsg.textContent = msg; mNo.style.display = yes ? 'block' : 'none';
+  modal.style.display = 'flex';
+  mYes.onclick = () => { modal.style.display = 'none'; if(yes) yes(); };
+  mNo.onclick = () => { modal.style.display = 'none'; };
+}
+function tell(msg){ ask(msg, null); }
+
+// ---------- 저장 ----------
+// { 학교이름: { "1부": [{name, phone}], "2부": [...] } }
+let db = JSON.parse(localStorage.getItem('attDB') || 'null');
+if(!db){
+  db = {};
+  const old = JSON.parse(localStorage.getItem('attData') || '{}');
+  for(const k in old) db[k] = {'1부': old[k], '2부': []};
+}
+let curS = localStorage.getItem('attCurS') || '';
+let curP = localStorage.getItem('attCurP') || '1부';
+let editIdx = -1;
+let aiRows = [];
+// { "학교|부": { "2026-11-12": "로봇 팔 만들기" } }
+let lessons = JSON.parse(localStorage.getItem('attLessons') || '{}');
+function saveLessons(){ localStorage.setItem('attLessons', JSON.stringify(lessons)); }
+function ymd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+const todayKey = ymd(new Date());
+apiKey.value = localStorage.getItem('attKey') || '';
+
+msgA.value = localStorage.getItem('attMsgA') || '안녕하세요. 이름이(가) 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.';
+msgL.value = localStorage.getItem('attMsgL') || '안녕하세요. 이름이(가) 조금 늦었지만 지금 방과후 수업에 들어왔습니다. 걱정하지 않으셔도 됩니다.';
+msgB.value = localStorage.getItem('attMsgB') || '안녕하세요. 오늘 방과후 수업을 잘 마치고 아이들이 귀가했습니다. 감사합니다.';
+msgE.value = localStorage.getItem('attMsgE') || '안녕하세요. 이름이(가) 오늘 방과후 수업을 잘 마치고 귀가했습니다.';
+
+const today = new Date().toLocaleDateString('ko-KR');
+let day = JSON.parse(localStorage.getItem('attDay') || '{}');
+if(day.date !== today || !day.v2) day = {date: today, v2: true, cls: {}};
+
+if('contacts' in navigator && 'ContactsManager' in window) pickBtn.style.display = 'block';
+
+function save(){
+  localStorage.setItem('attDB', JSON.stringify(db));
+  localStorage.setItem('attCurS', curS);
+  localStorage.setItem('attCurP', curP);
+}
+function saveDay(){ localStorage.setItem('attDay', JSON.stringify(day)); }
+function saveMsg(){
+  localStorage.setItem('attMsgA', msgA.value);
+  localStorage.setItem('attMsgE', msgE.value);
+  localStorage.setItem('attMsgL', msgL.value);
+  localStorage.setItem('attMsgB', msgB.value);
+}
+function stuList(){ return (db[curS] && db[curS][curP]) || []; }
+function st(){
+  const k = curS + '|' + curP;
+  if(!day.cls[k]) day.cls[k] = {absent:{}, sentA:{}, sentE:{}, sentL:{}};
+  if(!day.cls[k].sentL) day.cls[k].sentL = {};
+  return day.cls[k];
+}
+function resetDay(){ delete day.cls[curS + '|' + curP]; saveDay(); }
+function onlyNum(p){ return String(p || '').replace(/[^0-9]/g,''); }
+function fmtPhone(p){ // 01012345678 → 010-1234-5678
+  const d = onlyNum(p);
+  if(d.startsWith('02')){
+    if(d.length === 9)  return d.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+    if(d.length === 10) return d.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+  if(d.length === 11) return d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  if(d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  return d;
+}
+function liveFmt(el){ el.value = fmtPhone(el.value); }
+function esc(t){ return String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------- 학교·부 ----------
+function openAddSchool(){
+  addSchoolBox.style.display = addSchoolBox.style.display === 'none' ? 'block' : 'none';
+  if(addSchoolBox.style.display === 'block') newSchool.focus();
+}
+function addSchool(){
+  const n = newSchool.value.trim();
+  if(!n) return tell('학교 이름을 넣어 주세요');
+  if(db[n]) return tell('이미 있는 학교예요');
+  db[n] = {'1부': [], '2부': []};
+  newSchool.value = ''; addSchoolBox.style.display = 'none';
+  curS = n; curP = '1부'; save(); clearSide(); draw();
+}
+function selS(i){ curS = Object.keys(db)[i]; curP = '1부'; save(); clearSide(); draw(); }
+function delSchool(){
+  ask(curS + '을(를) 명단까지 모두 삭제할까요?', () => {
+    delete db[curS]; curS = Object.keys(db)[0] || ''; curP = '1부'; save(); clearSide(); draw();
+  });
+}
+function selP(p){ curP = p; save(); clearSide(); draw(); }
+function addPart(){
+  const n = (Object.keys(db[curS]).length + 1) + '부';
+  db[curS][n] = []; curP = n; save(); clearSide(); draw();
+}
+function delPart(){
+  const parts = Object.keys(db[curS]), last = parts[parts.length - 1];
+  ask(last + '을(를) 명단까지 삭제할까요?', () => {
+    delete db[curS][last]; curP = '1부'; save(); clearSide(); draw();
+  });
+}
+function clearSide(){
+  editIdx = -1; stuBtn.textContent = '학생 추가';
+  aiRows = []; aiResult.innerHTML = ''; aiStatus.innerHTML = '';
+}
+
+// ---------- 한 명씩 추가·수정·삭제 ----------
+function addStu(){
+  if(!curS) return tell('먼저 위에서 학교를 추가하세요');
+  const n = sName.value.trim(), p = onlyNum(sPhone.value);
+  if(!n || !p) return tell('이름과 전화번호를 모두 넣어 주세요');
+  if(editIdx >= 0){ stuList()[editIdx] = {name:n, phone:p}; editIdx = -1; stuBtn.textContent = '학생 추가'; }
+  else stuList().push({name:n, phone:p});
+  save(); sName.value = ''; sPhone.value = ''; draw();
+}
+function editStu(i){
+  const s = stuList()[i];
+  sName.value = s.name; sPhone.value = fmtPhone(s.phone); editIdx = i;
+  stuBtn.textContent = '수정 완료'; sName.focus();
+}
+function delStu(i){
+  ask(stuList()[i].name + '을(를) 명단에서 삭제할까요?', () => {
+    stuList().splice(i,1); save(); resetDay(); draw();
+  });
+}
+async function pickContacts(){
+  if(!curS) return tell('먼저 위에서 학교를 추가하세요');
+  try{
+    const cs = await navigator.contacts.select(['name','tel'], {multiple:true});
+    cs.forEach(c => {
+      const tel = onlyNum(c.tel && c.tel[0]);
+      if(tel) stuList().push({name: (c.name && c.name[0]) || tel, phone: tel});
+    });
+    save(); draw();
+    if(cs.length) tell('불러왔어요. 연락처 이름이 "민수 엄마"처럼 되어 있으면 "수정"을 눌러 아이 이름으로 바꿔 주세요.');
+  }catch(e){}
+}
+
+// ---------- 사진으로 명단 추가 (Gemini) ----------
+const MODELS = ['gemini-flash-latest', 'gemini-3.1-flash-lite'];
+
+function shrink(file){ // 사진을 작게 줄여서 보냄
+  return new Promise((ok, no) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = img.width * k; c.height = img.height * k;
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    img.onerror = no;
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function readPhoto(input){
+  const file = input.files[0]; input.value = '';
+  if(!file) return;
+  if(!curS) return tell('먼저 위에서 학교를 추가하세요');
+  const key = apiKey.value.trim();
+  if(!key) return tell('아래 "AI 설정"에 Gemini API 키를 먼저 넣어 주세요');
+
+  aiStatus.innerHTML = '<small>⏳ 명단을 읽고 있어요...</small>'; aiResult.innerHTML = '';
+  const prompt = '이 이미지는 학생 명단입니다. 학생 이름과 학부모(보호자) 전화번호를 찾아 ' +
+    'JSON 배열로만 답하세요. 예: [{"name":"홍길동","phone":"01012345678"}] ' +
+    '전화번호가 여러 개면 학부모 번호 하나만 넣고, 번호가 없으면 phone은 빈 문자열로 하세요.';
+  try{
+    const b64 = await shrink(file);
+    let text = '', lastErr = '';
+    for(const m of MODELS){
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [{parts: [{text: prompt}, {inline_data: {mime_type: 'image/jpeg', data: b64}}]}],
+          generationConfig: {responseMimeType: 'application/json'}
+        })
+      });
+      const j = await res.json();
+      if(res.ok){ text = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || ''; break; }
+      lastErr = j.error?.message || res.status;
+    }
+    if(!text) throw new Error(lastErr || '응답 없음');
+    const arr = JSON.parse(text.replace(/```json|```/g, '').trim());
+    aiRows = arr.map(r => ({name: String(r.name || '').trim(), phone: onlyNum(r.phone), ok: true}))
+                .filter(r => r.name);
+    aiStatus.innerHTML = aiRows.length
+      ? `<small>✅ ${aiRows.length}명을 찾았어요. 틀린 곳은 고치고, 넣지 않을 아이는 체크를 빼 주세요.</small>`
+      : '<small>이름을 찾지 못했어요. 더 선명한 사진으로 다시 해 보세요.</small>';
+    drawAI();
+  }catch(e){
+    aiStatus.innerHTML = `<small>❌ 읽지 못했어요: ${esc(e.message)}<br>API 키가 맞는지 확인해 주세요.</small>`;
+  }
+}
+function drawAI(){
+  if(!aiRows.length){ aiResult.innerHTML = ''; return; }
+  aiResult.innerHTML = aiRows.map((r,i) =>
+    `<div class="row">
+      <input type="checkbox" ${r.ok?'checked':''} onchange="aiRows[${i}].ok=this.checked">
+      <input class="mini" value="${esc(r.name)}" oninput="aiRows[${i}].name=this.value" style="flex:1">
+      <input class="mini" value="${fmtPhone(r.phone)}" type="tel" oninput="liveFmt(this); aiRows[${i}].phone=this.value" style="flex:1.4">
+    </div>`).join('') +
+    `<button class="on" onclick="addAI()">체크한 아이들을 ${esc(curP)} 명단에 추가</button>`;
+}
+function addAI(){
+  const L = stuList(); let n = 0, skip = 0;
+  aiRows.filter(r => r.ok).forEach(r => {
+    const name = r.name.trim(), phone = onlyNum(r.phone);
+    if(!name || !phone){ skip++; return; }
+    if(L.some(s => s.name === name && s.phone === phone)){ skip++; return; }
+    L.push({name, phone}); n++;
+  });
+  save(); aiRows = []; aiResult.innerHTML = '';
+  aiStatus.innerHTML = `<small>✅ ${n}명을 추가했어요${skip ? ` (번호가 없거나 이미 있는 ${skip}명은 뺐어요)` : ''}</small>`;
+  draw();
+}
+
+// ---------- 수업 내용 ----------
+function lessonMap(){
+  const k = curS + '|' + curP;
+  if(!lessons[k]) lessons[k] = {};
+  return lessons[k];
+}
+function rawTodayLesson(){ return curS ? (lessonMap()[todayKey] || '') : ''; }
+function todayLessonText(){ return (curS && st().noLesson) ? '' : rawTodayLesson(); }
+function toggleNoLesson(v){ st().noLesson = !v; saveDay(); draw(); }
+function addLesson(){
+  if(!curS) return tell('먼저 위에서 학교를 추가하세요');
+  const d = lDate.value, t = lText.value.trim();
+  if(!d || !t) return tell('날짜와 수업 내용을 모두 넣어 주세요');
+  if(lEditDate && lEditDate !== d) delete lessonMap()[lEditDate]; // 날짜를 바꿔서 수정한 경우
+  lessonMap()[d] = t; saveLessons();
+  lText.value = ''; lEditDate = ''; lBtn.textContent = '수업 내용 저장'; draw();
+}
+let lEditDate = '';
+function editLesson(d){
+  lessonDet.open = true;
+  lDate.value = d; lText.value = lessonMap()[d]; lEditDate = d;
+  lBtn.textContent = '수정 완료'; lText.focus();
+}
+function addLessonBulk(){
+  if(!curS) return tell('먼저 위에서 학교를 추가하세요');
+  const now = new Date(); let n = 0, bad = [];
+  lBulk.value.split('\n').map(x => x.trim()).filter(Boolean).forEach(line => {
+    const m = line.match(/^(\d{1,2})\s*[\/.\-월]\s*(\d{1,2})\s*일?\s*[:\-]?\s*(.+)$/);
+    if(!m){ bad.push(line); return; }
+    const mon = +m[1], dd = +m[2];
+    let y = now.getFullYear();
+    if(mon < now.getMonth() + 1 - 2) y++; // 12월에 1월 계획을 적는 경우
+    lessonMap()[ymd(new Date(y, mon - 1, dd))] = m[3].trim(); n++;
+  });
+  saveLessons(); draw();
+  if(bad.length){ lBulk.value = bad.join('\n'); tell(`${n}개를 저장했어요. 날짜를 못 알아본 줄은 칸에 남겨 두었어요. "11/12 내용"처럼 고쳐 주세요.`); }
+  else { lBulk.value = ''; tell(`${n}개를 저장했어요`); }
+}
+function delLesson(d){
+  ask(d + ' 수업 내용을 지울까요?', () => { delete lessonMap()[d]; saveLessons(); draw(); });
+}
+function josa(word){ // 을/를 자동으로 고르기
+  const c = word.charCodeAt(word.length - 1);
+  if(c < 0xAC00 || c > 0xD7A3) return '을(를)';
+  return (c - 0xAC00) % 28 ? '을' : '를';
+}
+function withLesson(text){
+  const ls = todayLessonText();
+  if(!ls) return text.replace(/[^.!?]*수업내용[^.!?]*[.!?]?\s*/g, '').trim();
+  if(text.includes('수업내용')) return text.replaceAll('수업내용', ls);
+  return text.trim() + ` 오늘은 ${ls}${josa(ls)} 배웠습니다.`;
+}
+
+// ---------- 출석·문자 ----------
+function toggleAbs(i, v){ st().absent[i] = v; saveDay(); draw(); }
+function smsLink(phone, text){
+  const ios = /iPhone|iPad/i.test(navigator.userAgent);
+  return `sms:${phone}${ios ? '&' : '?'}body=${encodeURIComponent(text)}`;
+}
+function sendBulk(){
+  const L = stuList(), t = st();
+  const idx = L.map((s,i) => i).filter(i => !t.absent[i]);
+  if(!idx.length) return tell('보낼 아이가 없어요');
+  ask(`귀가 문자를 ${idx.length}명에게 한꺼번에 보낼까요?\n문자 앱이 열리면 받는 사람을 확인하고 보내기를 누르세요.`, () => {
+    const phones = idx.map(i => L[i].phone).join(',');
+    const body = encodeURIComponent(withLesson(msgB.value));
+    const ios = /iPhone|iPad/i.test(navigator.userAgent);
+    idx.forEach(i => t.sentE[i] = true); saveDay(); draw();
+    location.href = ios ? `sms://open?addresses=${phones}&body=${body}` : `sms:${phones}?body=${body}`;
+  });
+}
+function sendOne(i, type){
+  const s = stuList()[i], t = st();
+  let text = ({A: msgA, L: msgL, E: msgE}[type].value).replaceAll('이름', s.name);
+  if(type === 'E') text = withLesson(text);
+  t['sent' + type][i] = true; saveDay(); draw();
+  location.href = smsLink(s.phone, text);
+}
+
+// ---------- 백업·복구·초기화 ----------
+const canPickFolder = 'showSaveFilePicker' in window;
+function backupName(){
+  const d = new Date();
+  return `출석관리_${String(d.getFullYear()).slice(2)}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.json`;
+}
+function attKeys(){ // API 키는 백업에 넣지 않음
+  return Object.keys(localStorage).filter(k => k.startsWith('att') && k !== 'attKey');
+}
+async function backup(){
+  const data = {app: '출석관리', saved: new Date().toISOString(), items: {}};
+  attKeys().forEach(k => data.items[k] = localStorage.getItem(k));
+  const blob = new Blob([JSON.stringify(data, null, 1)], {type: 'application/json'});
+  if(canPickFolder){ // 컴퓨터 크롬·엣지: 저장할 폴더를 묻는 창
+    try{
+      const h = await showSaveFilePicker({
+        id: 'attBackup', suggestedName: backupName(), startIn: 'documents',
+        types: [{description: '출석관리 백업', accept: {'application/json': ['.json']}}]
+      });
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      return tell('백업했어요: ' + h.name);
+    }catch(e){ if(e.name === 'AbortError') return; }
+  }
+  // 휴대폰: 다운로드로 저장
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = backupName();
+  document.body.appendChild(a); a.click(); a.remove();
+  tell(backupName() + ' 파일을 저장했어요. 저장 폴더를 고르는 창이 안 떴다면 "다운로드" 폴더에 있어요.');
+}
+async function restore(){
+  if('showOpenFilePicker' in window){ // 백업할 때 고른 폴더가 먼저 열림
+    try{
+      const [h] = await showOpenFilePicker({
+        id: 'attBackup', startIn: 'documents',
+        types: [{description: '출석관리 백업', accept: {'application/json': ['.json']}}]
+      });
+      return restoreFromFile(await h.getFile());
+    }catch(e){ if(e.name === 'AbortError') return; }
+  }
+  restoreFile.click(); // 휴대폰: 최근 폴더가 먼저 보이고, 없으면 직접 고르기
+}
+function restoreFromFile(file){
+  if(!file) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    let data;
+    try{ data = JSON.parse(rd.result); }catch(e){ return tell('백업 파일이 아니에요'); }
+    if(!data || data.app !== '출석관리' || !data.items) return tell('출석관리 백업 파일이 아니에요');
+    const when = (data.saved || '').slice(0,10);
+    ask(`${file.name} (${when} 백업)으로 복구할까요?\n지금 들어 있는 내용은 이 파일 내용으로 바뀌어요.`, () => {
+      attKeys().forEach(k => localStorage.removeItem(k));
+      for(const k in data.items) if(k !== 'attKey') localStorage.setItem(k, data.items[k]);
+      location.reload();
+    });
+  };
+  rd.readAsText(file);
+}
+function resetAll(){
+  ask('초기화하면 학교, 명단, 수업 내용, 문구가 모두 지워져요. 먼저 백업하셨나요?', () => {
+    setTimeout(() => ask('정말 모두 지울까요? 되돌릴 수 없어요.', () => {
+      attKeys().forEach(k => localStorage.removeItem(k));
+      location.reload();
+    }), 50);
+  });
+}
+
+// ---------- 화면 그리기 ----------
+const TAB_COLORS = ['#ffd6d6','#cfe8ff','#d8f2cf','#fff0c2','#e6d9ff','#ffd9ec','#ccf2ec','#ffe1c7'];
+function draw(){
+  const schools = Object.keys(db);
+  if(!db[curS]) curS = schools[0] || '';
+  if(curS && !db[curS][curP]) curP = '1부';
+
+  schoolTabs.innerHTML = schools.map((s,i) =>
+    `<button class="tab ${s===curS?'act':''}" style="${s===curS?'':'background:'+TAB_COLORS[i % TAB_COLORS.length]}" onclick="selS(${i})">${esc(s)}</button>`).join('') +
+    `<button class="tab add" onclick="openAddSchool()">+ 학교</button>`;
+
+  if(!curS){
+    schoolTitle.textContent = '위의 "+ 학교"를 눌러 학교를 추가하세요';
+    schoolTitle.style.display = 'block';
+    partTabs.innerHTML = ''; schoolTools.innerHTML = '';
+  } else {
+    const parts = Object.keys(db[curS]);
+    schoolTitle.style.display = 'none';
+    partTabs.innerHTML = parts.map(p =>
+      `<button class="tab ${p===curP?'act':''}" onclick="selP('${p}')">${p}</button>`).join('') +
+      `<button class="tab add" onclick="addPart()">+ ${parts.length + 1}부</button>` +
+      (parts.length > 2 ? `<button class="tab gray" style="color:#fff" onclick="delPart()">${parts[parts.length-1]} 삭제</button>` : '') +
+      `<button class="tab del" style="color:#fff" onclick="delSchool()">학교 삭제</button>`;
+    schoolTools.innerHTML = '';
+  }
+  const L = stuList(), t = curS ? st() : {absent:{}, sentA:{}, sentE:{}, sentL:{}};
+  listTitle.textContent = curS ? `${curS} ${curP} 학생 명단 (${L.length}명)` : '학생 명단';
+
+  list.innerHTML = L.map((s,i) =>
+    `<div class="row"><span>${esc(s.name)} <small>${fmtPhone(s.phone)}</small></span>
+     <button class="gray" onclick="editStu(${i})">수정</button>
+     <button class="del" onclick="delStu(${i})">삭제</button></div>`).join('')
+    || '<small>아직 학생이 없어요</small>';
+
+  check.innerHTML = L.map((s,i) =>
+    `<label class="row ${t.absent[i]?'abs':''}">
+      <input type="checkbox" ${t.absent[i]?'checked':''} onchange="toggleAbs(${i}, this.checked)">
+      <span>${esc(s.name)}</span>
+    </label>`).join('')
+    || '<small>학생 명단을 먼저 넣어 주세요</small>';
+
+  sendA.innerHTML = L.map((s,i) => t.absent[i] ?
+    `<div class="row"><span>${esc(s.name)}</span>
+     <button class="${t.sentA[i]?'sent':'btnS'}" onclick="sendOne(${i},'A')">${t.sentA[i]?'보냄':'결석 문자'}</button></div>` : '').join('')
+    || '<small>결석한 아이가 없어요 👍</small>';
+  sendL.innerHTML = L.map((s,i) => (t.sentA[i] && !t.absent[i]) ?
+    `<div class="row"><span>${esc(s.name)}</span>
+     <button class="${t.sentL[i]?'sent':'btnL'}" onclick="sendOne(${i},'L')">${t.sentL[i]?'보냄':'출석 문자'}</button></div>` : '').join('')
+    || '<small>늦게 온 아이가 없어요</small>';
+  const lm = curS ? lessonMap() : {};
+  const days = Object.keys(lm).sort();
+  lessonTitle.textContent = curS ? `📅 ${curS} ${curP} 수업 내용 (${days.length}개)` : '📅 수업 내용';
+  lessonList.innerHTML = days.map(d =>
+    `<div class="row" ${d===todayKey?'style="background:#eaf7ef"':''}><span><b>${d.slice(5).replace('-','/')}</b> ${esc(lm[d])}${d===todayKey?' <small>← 오늘</small>':''}</span>
+     <button class="gray" onclick="editLesson('${d}')">수정</button>
+     <button class="del" onclick="delLesson('${d}')">삭제</button></div>`).join('')
+    || '<small>아직 적어 둔 수업 내용이 없어요</small>';
+  const raw = rawTodayLesson(), tl = todayLessonText();
+  todayLesson.innerHTML = !raw
+    ? '<div class="today" style="background:#f4f4f4"><small>오늘 날짜에 적어 둔 수업 내용이 없어요</small></div>'
+    : `<div class="today" ${tl?'':'style="background:#f4f4f4"'}>📚 오늘 수업 내용: <b>${esc(raw)}</b><br>
+       <label><input type="checkbox" style="width:auto;margin:6px 6px 0 0" ${tl?'checked':''} onchange="toggleNoLesson(this.checked)">오늘 문자에 수업 내용 넣기</label></div>`;
+
+  const n = L.filter((s,i) => !t.absent[i]).length;
+  bulkBtn.innerHTML = n ? `<button class="on" onclick="sendBulk()">귀가 문자 한꺼번에 보내기 (${n}명)</button>` : '';
+  sendE.innerHTML = L.map((s,i) => !t.absent[i] ?
+    `<div class="row"><span>${esc(s.name)}</span>
+     <button class="${t.sentE[i]?'sent':'on'}" onclick="sendOne(${i},'E')">${t.sentE[i]?'보냄':'귀가 문자'}</button></div>` : '').join('')
+    || '<small>귀가 문자를 보낼 아이가 없어요</small>';
+}
+lDate.value = todayKey;
+backupTip.innerHTML = '';
+draw();
+if(!Object.keys(db).length) addSchoolBox.style.display = 'block';
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
