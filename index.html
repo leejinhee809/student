@@ -433,9 +433,13 @@ function withLesson(text){
 
 // ---------- 출석·문자 ----------
 function toggleAbs(i, v){ st().absent[i] = v; saveDay(); draw(); }
+// 일부 문자 앱이 &, #, + 를 주소 기호로 잘못 읽어 뒤가 잘리므로, 모양이 같은 전각 글자로 바꿔 보냄
+function safeBody(text){
+  return encodeURIComponent(text.replace(/&/g, '＆').replace(/#/g, '＃').replace(/\+/g, '＋'));
+}
 function smsLink(phone, text){
   const ios = /iPhone|iPad/i.test(navigator.userAgent);
-  return `sms:${phone}${ios ? '&' : '?'}body=${encodeURIComponent(text)}`;
+  return `sms:${phone}${ios ? '&' : '?'}body=${safeBody(text)}`;
 }
 function sendBulk(){
   const L = stuList(), t = st();
@@ -443,7 +447,7 @@ function sendBulk(){
   if(!idx.length) return tell('보낼 아이가 없어요');
   ask(`귀가 문자를 ${idx.length}명에게 한꺼번에 보낼까요?\n문자 앱이 열리면 받는 사람을 확인하고 보내기를 누르세요.`, () => {
     const phones = idx.map(i => L[i].phone).join(',');
-    const body = encodeURIComponent(withLesson(msgB.value));
+    const body = safeBody(withLesson(msgB.value));
     const ios = /iPhone|iPad/i.test(navigator.userAgent);
     idx.forEach(i => t.sentE[i] = true); saveDay(); draw();
     location.href = ios ? `sms://open?addresses=${phones}&body=${body}` : `sms:${phones}?body=${body}`;
