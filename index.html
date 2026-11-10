@@ -50,6 +50,7 @@ button{background:#4a6cf7;color:#fff;border:none}
 .yearbar b{font-size:18px}
 .notiBtns{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:4px}.notiBtns button{margin:0;font-size:15px}
 .notice{border-left:6px solid #e67e22}.btnN{background:#e67e22}
+.badge{font-style:normal;font-size:12px;background:#fdebd3;color:#b9650b;border-radius:10px;padding:3px 8px;white-space:nowrap}
 .trio{display:flex;gap:6px;margin-top:6px}.trio button{flex:1;font-size:14px;padding:8px 4px;margin:0}
 .sub{border:1px solid #e3e7f2;border-radius:10px;padding:10px;margin:10px 0}
 small{color:#666}
@@ -90,8 +91,16 @@ details summary{cursor:pointer;font-weight:bold}
 
 <div class="box start">
   <b>수업 시작 — 결석 알림</b>
-  <textarea id="msgA" rows="3" oninput="saveMsg()"></textarea>
-  <div id="sendA"></div>
+  <div class="sub">
+    <b>📨 한꺼번에 보내기</b>
+    <textarea id="msgAB" rows="2" oninput="saveMsg()"></textarea>
+    <div id="bulkABtn"></div>
+  </div>
+  <details class="sub">
+    <summary>👤 한 명씩 보내기</summary>
+    <textarea id="msgA" rows="3" oninput="saveMsg()"></textarea>
+    <div id="sendA"></div>
+  </details>
 </div>
 
 <div class="box late">
@@ -226,6 +235,7 @@ apiKey.value = localStorage.getItem('attKey') || '';
 msgA.value = localStorage.getItem('attMsgA') || '안녕하세요. 이름이(가) 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.';
 msgL.value = localStorage.getItem('attMsgL') || '안녕하세요. 이름이(가) 조금 늦었지만 지금 방과후 수업에 들어왔습니다. 걱정하지 않으셔도 됩니다.';
 msgN.value = localStorage.getItem('attMsgN') || '';
+msgAB.value = localStorage.getItem('attMsgAB') || '안녕하세요. 자녀가 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.';
 msgB.value = localStorage.getItem('attMsgB') || '안녕하세요. 오늘 방과후 수업을 잘 마치고 아이들이 귀가했습니다. 감사합니다.';
 msgE.value = localStorage.getItem('attMsgE') || '안녕하세요. 이름이(가) 오늘 방과후 수업을 잘 마치고 귀가했습니다.';
 
@@ -247,6 +257,7 @@ function saveMsg(){
   localStorage.setItem('attMsgE', msgE.value);
   localStorage.setItem('attMsgL', msgL.value);
   localStorage.setItem('attMsgB', msgB.value);
+  localStorage.setItem('attMsgAB', msgAB.value);
 }
 function stuList(){ return (db[curS] && db[curS][curP]) || []; }
 function dayKey(p){ return curY + '|' + curS + '|' + (p || curP); }
@@ -254,6 +265,7 @@ function st(){
   const k = dayKey();
   if(!day.cls[k]) day.cls[k] = {absent:{}, sentA:{}, sentE:{}, sentL:{}};
   if(!day.cls[k].sentL) day.cls[k].sentL = {};
+  if(!day.cls[k].bulkA) day.cls[k].bulkA = {};
   return day.cls[k];
 }
 function resetDay(){ delete day.cls[dayKey()]; saveDay(); }
@@ -605,6 +617,38 @@ function sendNotice(i){
   if(!phones.length) return tell(`${part} 명단에 학생이 없어요`);
   ask(`${curS} ${part} 학부모 ${phones.length}명에게 공지를 보낼까요?`, () => openSmsMany(phones, text));
 }
+function givenName(full){ // 김민수 → 민수, 남궁민수 → 민수, 이준 → 이준
+  const n = String(full).trim();
+  if(!/^[가-힣]+$/.test(n)) return n;
+  if(n.length === 3) return n.slice(1);
+  if(n.length === 4) return n.slice(2);
+  return n;
+}
+function hasBatchim(w){
+  const c = w.charCodeAt(w.length - 1);
+  return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0;
+}
+function fillName(text, full){ // "이름이(가)" → 민수가 / 지훈이가
+  const g = givenName(full), b = hasBatchim(g), base = b ? g + '이' : g;
+  return text
+    .replace(/이름이\(가\)/g, base + '가')
+    .replace(/이름은\(는\)/g, base + '는')
+    .replace(/이름을\(를\)/g, base + '를')
+    .replace(/이름의/g, base + '의')
+    .replace(/이름/g, base);
+}
+function sendBulkA(){
+  const L = stuList(), t = st();
+  const idx = L.map((s,i) => i).filter(i => t.absent[i]);
+  if(!idx.length) return tell('결석 체크한 아이가 없어요');
+  ask(`결석 문자를 ${idx.length}명에게 한꺼번에 보낼까요?`, () => {
+    idx.forEach(i => t.bulkA[i] = true);
+    const now = new Date();
+    t.bulkAInfo = {n: idx.length, time: `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`};
+    saveDay(); draw();
+    openSmsMany(idx.map(i => L[i].phone), msgAB.value);
+  });
+}
 function sendBulk(){
   const L = stuList(), t = st();
   const idx = L.map((s,i) => i).filter(i => !t.absent[i]);
@@ -619,7 +663,7 @@ function sendBulk(){
 }
 function sendOne(i, type){
   const s = stuList()[i], t = st();
-  let text = ({A: msgA, L: msgL, E: msgE}[type].value).replaceAll('이름', s.name);
+  let text = fillName({A: msgA, L: msgL, E: msgE}[type].value, s.name);
   if(type === 'E') text = withLesson(text);
   t['sent' + type][i] = true; saveDay(); draw();
   location.href = smsLink(s.phone, text);
@@ -737,10 +781,12 @@ function draw(){
     || '<small>학생 명단을 먼저 넣어 주세요</small>';
 
   sendA.innerHTML = L.map((s,i) => t.absent[i] ?
-    `<div class="row"><span>${esc(s.name)}</span>
+    `<div class="row"><span>${esc(s.name)}</span>${t.bulkA[i] ? '<em class="badge">단체 보냄</em>' : ''}
      <button class="${t.sentA[i]?'sent':'btnS'}" onclick="sendOne(${i},'A')">${t.sentA[i]?'보냄':'결석 문자'}</button></div>` : '').join('')
     || '<small>결석한 아이가 없어요 👍</small>';
-  sendL.innerHTML = L.map((s,i) => (t.sentA[i] && !t.absent[i]) ?
+  const absN = L.filter((s,i) => t.absent[i]).length, bi = t.bulkAInfo;
+  bulkABtn.innerHTML = absN ? `<button class="btnS" onclick="sendBulkA()">결석 문자 한꺼번에 보내기 (${absN}명)</button>` : '<small>결석한 아이가 없어요 👍</small>';
+  sendL.innerHTML = L.map((s,i) => ((t.sentA[i] || t.bulkA[i]) && !t.absent[i]) ?
     `<div class="row"><span>${esc(s.name)}</span>
      <button class="${t.sentL[i]?'sent':'btnL'}" onclick="sendOne(${i},'L')">${t.sentL[i]?'보냄':'출석 문자'}</button></div>` : '').join('')
     || '<small>늦게 온 아이가 없어요</small>';
