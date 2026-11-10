@@ -127,7 +127,7 @@ details summary{cursor:pointer;font-weight:bold}
 <div class="box notice">
   <details id="noticeBox">
     <summary>📢 단체 공지</summary>
-    <textarea id="msgN" rows="5" lang="ko" placeholder="공지 내용을 적어 주세요" oninput="localStorage.setItem('attMsgN', msgN.value)"></textarea>
+    <textarea id="msgN" rows="5" lang="ko" placeholder="공지 내용을 적어 주세요" oninput="saveMsg()"></textarea>
     <div id="noticeBtn"></div>
   </details>
 </div>
@@ -232,12 +232,25 @@ function ymd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(
 const todayKey = ymd(new Date());
 apiKey.value = localStorage.getItem('attKey') || '';
 
-msgA.value = localStorage.getItem('attMsgA') || '안녕하세요. 이름이(가) 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.';
-msgL.value = localStorage.getItem('attMsgL') || '안녕하세요. 이름이(가) 조금 늦었지만 지금 방과후 수업에 들어왔습니다. 걱정하지 않으셔도 됩니다.';
-msgN.value = localStorage.getItem('attMsgN') || '';
-msgAB.value = localStorage.getItem('attMsgAB') || '안녕하세요. 자녀가 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.';
-msgB.value = localStorage.getItem('attMsgB') || '안녕하세요. 오늘 방과후 수업을 잘 마치고 아이들이 귀가했습니다. 감사합니다.';
-msgE.value = localStorage.getItem('attMsgE') || '안녕하세요. 이름이(가) 오늘 방과후 수업을 잘 마치고 귀가했습니다.';
+// 문구는 학교마다 따로 저장: { 학교이름: {A, AB, L, E, B, N} }
+const MSG_EL = {A: msgA, AB: msgAB, L: msgL, E: msgE, B: msgB, N: msgN};
+// 새 학교의 처음 문구 (예전에 쓰던 문구가 있으면 그걸로 시작)
+const MSG_DEF = {
+  A:  localStorage.getItem('attMsgA')  || '안녕하세요. 이름가 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.',
+  AB: localStorage.getItem('attMsgAB') || '안녕하세요. 자녀가 아직 방과후 수업에 들어오지 않았습니다. 확인 부탁드립니다.',
+  L:  localStorage.getItem('attMsgL')  || '안녕하세요. 이름가 조금 늦었지만 지금 방과후 수업에 들어왔습니다. 걱정하지 않으셔도 됩니다.',
+  E:  localStorage.getItem('attMsgE')  || '안녕하세요. 이름가 오늘 방과후 수업을 잘 마치고 귀가했습니다.',
+  B:  localStorage.getItem('attMsgB')  || '안녕하세요. 오늘 방과후 수업을 잘 마치고 아이들이 귀가했습니다. 감사합니다.',
+  N:  localStorage.getItem('attMsgN')  || ''
+};
+let msgs = JSON.parse(localStorage.getItem('attMsgs') || '{}');
+let msgSchool = null;
+function loadMsgs(){ // 학교가 바뀔 때만 그 학교 문구를 불러옴
+  if(msgSchool === curS) return;
+  msgSchool = curS;
+  const m = msgs[curS] || {};
+  for(const k in MSG_EL) MSG_EL[k].value = (m[k] !== undefined) ? m[k] : MSG_DEF[k];
+}
 
 const today = new Date().toLocaleDateString('ko-KR');
 let day = JSON.parse(localStorage.getItem('attDay') || '{}');
@@ -252,12 +265,11 @@ function save(){
   localStorage.setItem('attCurP', curP);
 }
 function saveDay(){ localStorage.setItem('attDay', JSON.stringify(day)); }
-function saveMsg(){
-  localStorage.setItem('attMsgA', msgA.value);
-  localStorage.setItem('attMsgE', msgE.value);
-  localStorage.setItem('attMsgL', msgL.value);
-  localStorage.setItem('attMsgB', msgB.value);
-  localStorage.setItem('attMsgAB', msgAB.value);
+function saveMsg(){ // 지금 고른 학교에만 저장
+  if(!curS) return;
+  msgs[curS] = {};
+  for(const k in MSG_EL) msgs[curS][k] = MSG_EL[k].value;
+  localStorage.setItem('attMsgs', JSON.stringify(msgs));
 }
 function stuList(){ return (db[curS] && db[curS][curP]) || []; }
 function dayKey(p){ return curY + '|' + curS + '|' + (p || curP); }
@@ -741,6 +753,7 @@ function draw(){
   const schools = Object.keys(db);
   if(!db[curS]) curS = schools[0] || '';
   if(curS && !db[curS][curP]) curP = firstPart();
+  loadMsgs();
   const ys = Object.keys(years).sort();
   yearLabel.textContent = curY + '년';
   yPrev.disabled = ys.indexOf(curY) <= 0;
