@@ -1,5 +1,5 @@
-// 앱을 고쳐서 다시 올릴 때마다 아래 숫자를 하나씩 올려 주세요 (v20 → v21)
-const CACHE = 'isaem-v20';
+// 앱을 고쳐서 다시 올릴 때마다 아래 숫자를 하나씩 올려 주세요 (v21 → v22)
+const CACHE = 'isaem-v21';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
